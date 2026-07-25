@@ -1,141 +1,209 @@
 import os
 import pandas as pd
 import networkx as nx
-from itertools import product
-
+from collections import defaultdict
+from datetime import datetime
+from copy import deepcopy
 
 try:
     CARPETA_SCRIPT = os.path.dirname(os.path.abspath(__file__))
 except NameError:
     CARPETA_SCRIPT = os.getcwd()
-
-RUTA = os.path.join(CARPETA_SCRIPT, "MD_BaseDatos.xlsx")
-HOJA = "Base"
-MINIMO_CALIFICACION = 2  
+RUTA_DATOS = os.path.join(CARPETA_SCRIPT, "MD_BaseDatos.xlsx")
+HOJA_DATOS = "Base"
 
 
-def parsear_hora(valor):
-    """Convierte 'HH:MM' o 'HH:MM:SS' (str u objeto time) a horas decimales."""
+def normalizar_hora_texto(valor):
+    """Convierte 'HH:MM:SS', 'HH:MM' o datetime.time a texto 'HH:MM'."""
     if pd.isna(valor):
         return None
-    if hasattr(valor, "hour"): 
-        return valor.hour + valor.minute / 60
+    if hasattr(valor, "hour"):  # datetime.time
+        return f"{valor.hour:02d}:{valor.minute:02d}"
     partes = str(valor).strip().split(":")
-    h = int(partes[0])
-    m = int(partes[1]) if len(partes) > 1 else 0
-    return h + m / 60
+    return f"{int(partes[0]):02d}:{int(partes[1]):02d}"
 
 
-def cargar_datos(ruta=RUTA, hoja=HOJA):
+def cargar_datos(ruta=RUTA_DATOS, hoja=HOJA_DATOS):
+
     df = pd.read_excel(ruta, sheet_name=hoja)
-    df = df.dropna(subset=["Materia", "Grupo"])
-    df["hora_inicio_dec"] = df["Hora inicio"].apply(parsear_hora)
-    df["hora_fin_dec"] = df["Hora fin"].apply(parsear_hora)
-    df["Dias de la semana"] = df["Dias de la semana"].str.strip()
-    return df
+    df = df.dropna(subset=["Materia", "Grupo"]).copy()
+    df["Dias de la semana"] = df["Dias de la semana"].astype(str).str.strip()
+    df["Hora inicio"] = df["Hora inicio"].apply(normalizar_hora_texto)
+    df["Hora fin"] = df["Hora fin"].apply(normalizar_hora_texto)
+    df["Calificacion"] = df["Calificacion"].fillna(0).astype(int)
+    df["Cupos"] = df["Cupos"].fillna(0).astype(int)
+    df = df.dropna(subset=["Hora inicio", "Hora fin"])
+    return df.to_dict("records")
 
 
-def construir_grupos(df):
-    """
-    materias[materia] = lista de grupos.
-    Cada grupo = {"grupo", "profesor", "calificacion", "sesiones": [(dia, ini, fin), ...]}
-    Un grupo puede tener varias sesiones (una por dia), y no todas tienen que
-    coincidir en horario entre si (ej. lunes 7-9, jueves 9-11).
-    """
-    materias = {}
-    for (materia, grupo), sub in df.groupby(["Materia", "Grupo"]):
-        sesiones = [
-            (row["Dias de la semana"], row["hora_inicio_dec"], row["hora_fin_dec"])
-            for _, row in sub.iterrows()
-            if row["hora_inicio_dec"] is not None and row["hora_fin_dec"] is not None
-        ]
-        materias.setdefault(materia, []).append({
-            "grupo": grupo,
-            "profesor": sub["Profesor"].iloc[0],
-            "calificacion": sub["Calificacion"].iloc[0],
-            "sesiones": sesiones,
-        })
-    return materias
+datos = cargar_datos()
+
+# Agrupar horarios por (materia, grupo)
+horarios_dict = defaultdict(list)
+for fila in datos:
+    horarios_dict[(fila["Materia"], fila["Grupo"])].append(fila)
 
 
-def sesiones_chocan(s1, s2):
-    dia1, ini1, fin1 = s1
-    dia2, ini2, fin2 = s2
-    if dia1 != dia2:
+def convertir_hora(hora_str):
+    return datetime.strptime(hora_str, "%H:%M")
+
+
+def hay_choque(h1, h2):
+    if h1["Dias de la semana"] != h2["Dias de la semana"]:
         return False
-    return not (fin1 <= ini2 or fin2 <= ini1)
+    inicio1, fin1 = convertir_hora(h1["Hora inicio"]), convertir_hora(h1["Hora fin"])
+    inicio2, fin2 = convertir_hora(h2["Hora inicio"]), convertir_hora(h2["Hora fin"])
+    return inicio1 < fin2 and inicio2 < fin1
 
 
-def grupos_chocan(g1, g2):
-    return any(sesiones_chocan(s1, s2) for s1 in g1["sesiones"] for s2 in g2["sesiones"])
+def construir_grafo_conflictos():
 
-
-def construir_grafo_conflictos(materias):
-    """Nodo = (materia, grupo). Arista = choque de horario entre grupos de materias distintas."""
     G = nx.Graph()
-    nodos_por_materia = {}
-    for materia, grupos in materias.items():
-        nodos = []
-        for g in grupos:
-            nodo_id = (materia, g["grupo"])
-            G.add_node(nodo_id, **g)
-            nodos.append(nodo_id)
-        nodos_por_materia[materia] = nodos
+    claves = list(horarios_dict.keys())
+    for clave in claves:
+        G.add_node(clave)
 
-    todos = list(G.nodes(data=True))
-    for i in range(len(todos)):
-        id1, data1 = todos[i]
-        for id2, data2 in todos[i + 1:]:
-            if id1[0] == id2[0]:
-                continue  
-            if grupos_chocan(data1, data2):
-                G.add_edge(id1, id2)
-
-    return G, nodos_por_materia
+    for i in range(len(claves)):
+        m1, g1 = claves[i]
+        for j in range(i + 1, len(claves)):
+            m2, g2 = claves[j]
+            if m1 == m2:
+                continue
+            if any(hay_choque(h1, h2) for h1 in horarios_dict[(m1, g1)] for h2 in horarios_dict[(m2, g2)]):
+                G.add_edge((m1, g1), (m2, g2))
+    return G
 
 
-def generar_propuestas(G, nodos_por_materia, minimo_calificacion=MINIMO_CALIFICACION, top=30):
-    materias_lista = list(nodos_por_materia.keys())
-    propuestas = []
-    for combo in product(*[nodos_por_materia[m] for m in materias_lista]):
-        
-        if any(G.has_edge(combo[i], combo[j])
-               for i in range(len(combo)) for j in range(i + 1, len(combo))):
+def generar_opciones(
+    materias,
+    max_opciones=5,
+    min_calificacion=3,
+    max_calificacion=None,
+    incluir_cero=False,
+    materias_fijas=None
+):
+    if materias_fijas is None:
+        materias_fijas = {}
+
+    opciones = []
+    grupos_por_materia = {}
+
+    for materia in materias:
+        # MATERIA FIJA
+        if materia in materias_fijas:
+            grupo_fijo = materias_fijas[materia]
+            horarios = horarios_dict.get((materia, grupo_fijo), [])
+
+            if not horarios:
+                print(f"No se encontro el grupo fijo {grupo_fijo} para {materia}")
+                grupos_por_materia[materia] = []
+                continue
+
+            calificaciones = [int(h["Calificacion"]) for h in horarios]
+            max_calif_grupo = max(calificaciones) if calificaciones else 0
+            tiene_cero = 0 in calificaciones
+
+            if max_calificacion is not None and max_calif_grupo > max_calificacion:
+                print(f"Grupo fijo {grupo_fijo} de {materia} excede max_calificacion")
+                grupos_por_materia[materia] = []
+                continue
+
+            if not incluir_cero and tiene_cero:
+                grupos_por_materia[materia] = []
+                continue
+
+            if max_calif_grupo < min_calificacion:
+                grupos_por_materia[materia] = []
+                continue
+
+            grupos_por_materia[materia] = [(grupo_fijo, horarios)]
             continue
-        calificaciones = [G.nodes[n]["calificacion"] for n in combo]
-        if min(calificaciones) < minimo_calificacion:
-            continue
-        score = sum(calificaciones) / len(calificaciones)
-        propuestas.append((score, combo))
 
-    propuestas.sort(key=lambda x: x[0], reverse=True)
-    return propuestas[:top]
+        # MATERIAS ALEATORIAS
+        grupos = [(grp, hs) for (mat, grp), hs in horarios_dict.items() if mat == materia]
+        grupos = [g for g in grupos if any(int(h["Cupos"]) > 0 for h in g[1])]
 
+        grupos_filtrados = []
+        for grupo, horarios in grupos:
+            calificaciones = [int(h["Calificacion"]) for h in horarios]
+            if not calificaciones:
+                continue
 
-def imprimir_propuesta(G, score, combo, indice):
-    print(f"\nPropuesta {indice} | Calificacion promedio: {score:.2f}")
-    for nodo in combo:
-        materia, grupo = nodo
-        data = G.nodes[nodo]
-        sesiones_str = "; ".join(
-            f"{d} {int(i)}:{int((i % 1) * 60):02d}-{int(f)}:{int((f % 1) * 60):02d}"
-            for d, i, f in data["sesiones"]
+            max_calif = max(calificaciones)
+            tiene_cero = 0 in calificaciones
+
+            if max_calificacion is not None and max_calif > max_calificacion:
+                continue
+
+            if incluir_cero:
+                if max_calif >= min_calificacion or tiene_cero:
+                    grupos_filtrados.append((grupo, horarios))
+            else:
+                if max_calif >= min_calificacion and not tiene_cero:
+                    grupos_filtrados.append((grupo, horarios))
+
+        grupos_filtrados.sort(
+            key=lambda x: max(int(h["Calificacion"]) for h in x[1]),
+            reverse=True
         )
-        print(f"   - {materia} | {grupo} | {data['profesor']} | "
-              f"Calif: {data['calificacion']} | {sesiones_str}")
+
+        grupos_por_materia[materia] = grupos_filtrados
+
+    def backtracking(idx, seleccion, horarios_ocupados):
+        if len(opciones) >= max_opciones:
+            return
+
+        if idx == len(materias):
+            opciones.append(deepcopy(seleccion))
+            return
+
+        materia = materias[idx]
+        for grupo, horarios in grupos_por_materia.get(materia, []):
+            if all(not hay_choque(h, h_ocp) for h in horarios for h_ocp in horarios_ocupados):
+                seleccion.append((materia, grupo, horarios))
+                horarios_ocupados.extend(horarios)
+                backtracking(idx + 1, seleccion, horarios_ocupados)
+                for _ in horarios:
+                    horarios_ocupados.pop()
+                seleccion.pop()
+
+    backtracking(0, [], [])
+    return opciones
 
 
 if __name__ == "__main__":
-    df = cargar_datos()
-    materias = construir_grupos(df)
-    G, nodos_por_materia = construir_grafo_conflictos(materias)
-
+    G = construir_grafo_conflictos()
     print(f"Grafo de conflictos: {G.number_of_nodes()} nodos, {G.number_of_edges()} aristas")
-    for m, nodos in nodos_por_materia.items():
-        print(f"  {m}: {len(nodos)} grupos")
 
-    propuestas = generar_propuestas(G, nodos_por_materia)
-    print(f"\n{len(propuestas)} propuestas validas encontradas")
+    materias_a_seleccionar = [
+        "Fundamentos de electricidad y magnetismo (1000017-B)",
+        "Cálculo en varias variables (1000006-B)",
+        "Ingeniería económica (2015703)",
+        
+    ]
 
-    for i, (score, combo) in enumerate(propuestas[:10], 1):
-        imprimir_propuesta(G, score, combo, i)
+    materias_fijas = {
+        "Estructuras de datos (2016699)": "(1) Grupo 1",
+        "Matemáticas discretas I (2025963)": "(1) Grupo 1"
+    }
+
+    opciones_generadas = generar_opciones(
+        materias_a_seleccionar,
+        max_opciones=20,
+        min_calificacion=2,
+        max_calificacion=3,
+        incluir_cero=True,
+        materias_fijas=materias_fijas,
+    )
+
+    if not opciones_generadas:
+        print("No se encontraron opciones validas con los filtros aplicados.")
+    else:
+        for idx, opcion in enumerate(opciones_generadas):
+            suma_calif = sum(int(h["Calificacion"]) for _, _, horarios in opcion for h in horarios)
+            print(f"\nOpcion {idx + 1} balance = {suma_calif}")
+            for materia, grupo, horarios in opcion:
+                print(f"  Materia: {materia}, Grupo: {grupo}")
+                for h in horarios:
+                    print(f"    Dia: {h['Dias de la semana']}, {h['Hora inicio']} - {h['Hora fin']}, "
+                          f"Profesor: {h['Profesor']}, Cupos: {h['Cupos']}, Calificacion: {h['Calificacion']}")
