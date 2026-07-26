@@ -34,6 +34,8 @@ SIA. Columnas: Materia, Grupo, Profesor, Cupos, Dias de la semana, Hora
 inicio, Hora fin, Calificacion (escala 0-4).
 
 ## Ejecución
+descargar el archivo .py que se encuentra en la rama feature, además el archivo .xlsx ya que es la base de datos con la que se realizan las pruebas, los requisitos se encuentran en un archivo .txt 
+
 \`\`\`
 python generador_horarios.py
 \`\`\`
