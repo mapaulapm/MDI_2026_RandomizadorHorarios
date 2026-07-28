@@ -84,8 +84,7 @@ El comportamiento puede personalizarse modificando los siguientes parámetros:
 - `max_calificacion`: calificación máxima aceptada.
 - `materias_fijas`: permite fijar un grupo específico para una materia determinada.
 - `incluir_cero`: permite aceptar profesores sin calificación registrada.
-- 
-En caso de querer cierto grupo de cierta materia fijo se debe de escribir en la sección materias_fijas y mantener tambien la materia en materias_a_seleccionar .
+En caso de querer cierto grupo de cierta materia fijo se debe de escribir en la sección materias_fijas y mantener tambien la materia en materias_a_seleccionar.
 ---
 
 ## Estado actual
