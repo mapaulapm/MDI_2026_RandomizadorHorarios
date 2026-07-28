@@ -1,52 +1,98 @@
 # MDI_2026_RandomizadorHorarios
-Generador de horarios que modela la oferta de materias como un grafo de conflictos y encuentra combinaciones de grupos sin choques de horario. Proyecto para Matemáticas Discretas I
 
-# Randomizador de Horarios
+Generador de horarios en Python que modela la oferta académica como un **grafo de conflictos**, donde cada grupo de una materia corresponde a un nodo y cada arista representa un choque de horario entre dos grupos. El sistema genera propuestas de horario sin conflictos utilizando un algoritmo de **backtracking con poda**.
 
-Generador de horarios en Python que modela la oferta académica como un
-grafo de conflictos: cada grupo de una materia es un nodo, y una arista
-conecta dos grupos que chocan en horario. Las propuestas válidas
-corresponden a combinaciones sin choques (conjuntos independientes del
-grafo, uno por materia).
+Proyecto desarrollado para la asignatura **Matemáticas Discretas I**.
+
+---
 
 ## Integrante
-Maria Paula Pérez Meléndez
+
+- Maria Paula Pérez Meléndez
+
+---
 
 ## Problema
-¿Cómo optimizar la selección de horarios según la oferta de materias de
-un semestre, evitando choques y priorizando profesores mejor calificados en foros estudiantiles?
+
+¿Cómo optimizar la selección de horarios según la oferta académica de un semestre, evitando choques entre materias y priorizando profesores mejor calificados según foros estudiantiles?
+
+---
 
 ## Requisitos
-- Python 3.10+
+
+- Python 3.10 o superior
 - pandas
 - networkx
 - openpyxl
 
-Instalar con:
-\`\`\`
+Instalación:
+
+```bash
 pip install pandas networkx openpyxl
-\`\`\`
+```
+
+También es posible instalar todas las dependencias desde el archivo `requirements.txt` mediante:
+
+```bash
+pip install -r requirements.txt
+```
+
+---
 
 ## Datos
-El archivo `MD_BaseDatos.xlsx` (hoja "Base") contiene la oferta real de
-materias usada para generar el horario del semestre actual, extraída del
-SIA. Columnas: Materia, Grupo, Profesor, Cupos, Dias de la semana, Hora
-inicio, Hora fin, Calificacion (escala 0-4).
+
+El archivo `MD_BaseDatos.xlsx` (hoja **Base**) contiene la oferta académica utilizada para las pruebas, extraída del SIA de la Universidad Nacional de Colombia.
+
+Columnas utilizadas:
+
+- Materia
+- Grupo
+- Profesor
+- Cupos
+- Días de la semana
+- Hora inicio
+- Hora fin
+- Calificación
+
+---
 
 ## Ejecución
-descargar el archivo .py que se encuentra en la rama feature, además el archivo .xlsx ya que es la base de datos con la que se realizan las pruebas, los requisitos se encuentran en un archivo .txt 
 
-\`\`\`
-python generador_horarios.py
-\`\`\`
+1. Descargar el archivo principal `.py`.
+2. Descargar el archivo `MD_BaseDatos.xlsx`.
+3. Instalar las dependencias.
+4. Ejecutar el archivo `.py`.
+
+```bash
+python entrega-final-v1.py
+```
+
+---
 
 ## Ejemplo de uso
-El script imprime el tamaño del grafo de conflictos y hasta 10 propuestas
-de horario ordenadas por calificación promedio de profesores.
+
+El programa imprime:
+
+- El tamaño del grafo de conflictos (número de nodos y aristas).
+- Varias propuestas de horario sin choques.
+- Una representación tabular de cada horario encontrado.
+
+El comportamiento puede personalizarse modificando los siguientes parámetros:
+
+- `max_opciones`: cantidad máxima de horarios a generar.
+- `min_calificacion`: calificación mínima aceptada para los profesores.
+- `max_calificacion`: calificación máxima aceptada.
+- `materias_fijas`: permite fijar un grupo específico para una materia determinada.
+- `incluir_cero`: permite aceptar profesores sin calificación registrada.
+- 
+En caso de querer cierto grupo de cierta materia fijo se debe de escribir en la sección materias_fijas y mantener tambien la materia en materias_a_seleccionar .
+---
 
 ## Estado actual
-- [x] Carga y limpieza de datos reales del SIA
-- [x] Construcción del grafo de conflictos con networkx
-- [x] Generación de propuestas válidas (conjuntos independientes)
-- [ ] Interfaz gráfica (fuera de alcance para esta entrega, ver informe)
-- [ ] Validación con más de un semestre de datos
+
+- ✅ Carga y limpieza de datos reales del SIA.
+- ✅ Construcción del grafo de conflictos con NetworkX.
+- ✅ Generación de propuestas de horario mediante backtracking.
+- ✅ Filtrado por cupos y calificación de profesores.
+- ✅ Soporte para materias con grupo fijo.
+- ❌ Interfaz gráfica (propuesta como trabajo futuro).
