@@ -104,7 +104,7 @@ def generar_opciones(
 
             if not horarios:
                 print(
-                    f"⚠️ No se encontró el grupo fijo '{grupo_fijo}' para {materia}"
+                    f"No se encontró el grupo fijo '{grupo_fijo}' para {materia}"
                 )
                 grupos_por_materia[materia] = []
                 continue
@@ -236,7 +236,8 @@ if __name__ == "__main__":
         f"Grafo de conflictos: {G.number_of_nodes()} nodos, {G.number_of_edges()} aristas"
     )
 
-    # todas las materias deben de aparecer en materias_a_seleccionar, en caso de querer un grupo fijo tienen que salir adicionalmente en materias_fijas junto con el número de grupo que se desea    materias_a_seleccionar = [
+    # todas las materias deben de aparecer en materias_a_seleccionar, en caso de querer un grupo fijo tienen que salir adicionalmente en materias_fijas junto con el número de grupo que se desea 
+    materias_a_seleccionar = [
         "Fundamentos de electricidad y magnetismo (1000017-B)",
         "Cálculo en varias variables (1000006-B)",
         "Estructuras de datos (2016699)",
