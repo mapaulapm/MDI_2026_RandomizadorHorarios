@@ -96,3 +96,8 @@ En caso de querer cierto grupo de cierta materia fijo se debe de escribir en la 
 - ✅ Filtrado por cupos y calificación de profesores.
 - ✅ Soporte para materias con grupo fijo.
 - ❌ Interfaz gráfica (propuesta como trabajo futuro).
+
+## IA
+- Recomendación de bibliotecas de Python apropiadas para el problema, en particular NetworkX para la construcción y manipulación del grafo de conflictos.
+- Apoyo en la redacción y revisión de algunas secciones del informe, mejorando la claridad y la organización del texto.
+- Resolución de dudas puntuales sobre Python, LaTeX y la documentación de algunas funciones utilizadas durante la implementación.
